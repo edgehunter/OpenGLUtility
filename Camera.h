@@ -8,18 +8,23 @@
 #include <glm/gtx/quaternion.hpp>
 
 
-enum class Relative_Direction { UP, DOWN, LEFT, RIGHT };
+
+enum class Relative_Direction { FORWARD, BACKWARD, LEFT, RIGHT, UP, DOWN };
 
 
 class Camera {
 
 
 public:
-	Camera(int WindowWidth, int WindowHeight, glm::vec3 initialPos, glm::vec3 initialTarget, glm::vec3 rotAxisX, glm::vec3 rotAxisY, glm::vec3 world_up);
-	void RotateCamera(glm::vec2 mouseDelta);
-	void TranslateCamera(Relative_Direction direction, GLfloat cameraSpeed);
-	void SetMouseSensitivity(GLfloat sensitivity);
-	void SetZoom(GLfloat zoom);
+
+	Camera(int WindowWidth, int WindowHeight, glm::vec3 initialPos, glm::vec3 initialTarget,  glm::vec3 rotAxisY, glm::vec3 world_up);
+	glm::mat4 GetCameraView();
+
+	void RotateCamera(const glm::vec2 &newMousePos);
+	void TranslateCamera(const Relative_Direction &direction, const GLfloat &cameraSpeed);
+	void SetMouseSensitivity(GLfloat &sensitivity);
+	void SetZoom(GLfloat &zoom);
+
 
 private:
 
@@ -47,8 +52,13 @@ private:
 	GLfloat mouseSensitivity;
 
 
-	glm::mat4 rotation;
+	GLfloat rotationAboutX;
 	glm::mat4 view;
+
+	glm::vec2 mousePosition;
+
+	void ConstructViewMatrix();
+	
 
 
 
@@ -57,52 +67,86 @@ private:
 Camera::Camera(
 		int WindowWidth, 
 		int WindowHeight,
-		glm::vec3 initialPos = glm::vec3(0.0f, 0.0f, 3.0f),
+		glm::vec3 initialPos = glm::vec3(3.0f, 0.0f, 0.0f),
 	    glm::vec3 initialTarget = glm::vec3(0.0f,0.0f,0.0f),
 		glm::vec3 rotAxisX = glm::vec3(1.0f,0.0f,0.0f), 
-		glm::vec3 rotAxisY = glm::vec3(0.0f,1.0f,0.0f), 
 		glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f)) : 
-		mouseSensitivity(0.5f), 
+		mouseSensitivity(0.00025f), 
 	    zoom(45.0f) {
 			this->xMid = WindowWidth / 2;
 			this->yMid = WindowHeight / 2;
-			this->rotAxisX = rotAxisX;
+			this->mousePosition = glm::vec2(xMid, yMid);
 			this->rotAxisY = rotAxisY;
+			this->worldUp = worldUp;
 			this->cameraPosition = initialPos;
 			this->cameraDirection = glm::normalize(initialPos - initialTarget);
-			this->worldUp = worldUp;
+			this->cameraRight = glm::normalize(glm::cross(worldUp, cameraDirection));
+			this->cameraUp = glm::cross(cameraDirection, cameraRight);
+			ConstructViewMatrix();
 }
 
-void Camera::RotateCamera(glm::vec2 mouseDelta) {
-	GLfloat rotAngleX = 2.0f; //mouseDelta.x / mouseSensitivity;
-	GLfloat rotAngleY = 2.0f; //mouseDelta.y / mouseSensitivity;
+void Camera::RotateCamera(const glm::vec2 &newMousePos) {
+	
+   
 
-	glm::quat rotation = glm::angleAxis(glm::degrees(rotAngleY), normalize(rotAxisY)) * glm::angleAxis(glm::degrees(rotAngleX), normalize(rotAxisX));
-	cameraDirection = rotation * cameraDirection;
+	GLfloat rotAngleY = (mousePosition.x - newMousePos.x) * mouseSensitivity;
+	GLfloat rotAngleX = (mousePosition.y - newMousePos.y) * mouseSensitivity;
+	
+  
+
+	if ( abs(rotAngleX) > std::numeric_limits<float>::epsilon()) {
+		glm::quat rotationX = glm::normalize(glm::angleAxis(glm::degrees(rotAngleX), normalize(cameraRight)));
+		cameraDirection = rotationX * cameraDirection;
+	}
+
+	if ( abs(rotAngleY) > std::numeric_limits<float>::epsilon()) {
+		glm::quat rotationY = glm::normalize(glm::angleAxis(glm::degrees(rotAngleY), normalize(rotAxisY)));
+		cameraDirection = rotationY * cameraDirection;
+	}
+
+	
 	cameraRight = glm::normalize(glm::cross(worldUp, cameraDirection));
 	cameraUp = glm::cross(cameraDirection, cameraRight);
-    
+	mousePosition = newMousePos;
 }
 
-void Camera::TranslateCamera(Relative_Direction direction, GLfloat cameraSpeed) {
+void Camera::TranslateCamera(const Relative_Direction &direction, const GLfloat &cameraSpeed) {
 	switch (direction) {
-		case Relative_Direction::UP:
-//#TODO
-				break;
-		case Relative_Direction::DOWN:
-				break;
+		case Relative_Direction::FORWARD:
+			cameraPosition -= glm::normalize(cameraDirection) * cameraSpeed;
+			break;
+		case Relative_Direction::BACKWARD:
+			cameraPosition += glm::normalize(cameraDirection) * cameraSpeed;
+			break;
 		case Relative_Direction::LEFT:
-				break;
+			cameraPosition -= glm::normalize(cameraRight) * cameraSpeed;
+			break;
 		case Relative_Direction::RIGHT:
-				break;
+			cameraPosition += glm::normalize(cameraRight) * cameraSpeed;
+			break;
 	}
 }
 
-void Camera::SetMouseSensitivity(GLfloat sensitivity) {
 
+glm::mat4 Camera::GetCameraView() {
+	ConstructViewMatrix();
+	return view;
 }
 
-void Camera::SetZoom(GLfloat zoom) {
+void Camera::ConstructViewMatrix() {
+	glm::mat4 viewMat = glm::transpose(glm::mat4(glm::vec4(cameraRight, glm::dot(cameraRight, -cameraPosition)),
+		glm::vec4(cameraUp, glm::dot(cameraUp, -cameraPosition)),
+		glm::vec4(cameraDirection, glm::dot(cameraDirection, -cameraPosition)),
+		glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)));
+	
+	this->view = viewMat;
+}
 
+void Camera::SetMouseSensitivity(GLfloat &sensitivity) {
+	this->mouseSensitivity = sensitivity;
+}
+
+void Camera::SetZoom(GLfloat &zoom) {
+	this->zoom = zoom;
 }
 #endif
