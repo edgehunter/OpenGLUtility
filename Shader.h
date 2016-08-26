@@ -1,3 +1,6 @@
+/* By Martin Lai, last edited August 26, 2016. 
+All rights reserved. */
+
 #ifndef SHADER_H
 #define SHADER_H
 
