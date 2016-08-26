@@ -1,3 +1,6 @@
+/* By Martin Lai, last edited August 26, 2016. 
+All rights reserved. */
+
 #ifndef CAMERA_H
 #define CAMERA_H
 
